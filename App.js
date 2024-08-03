@@ -1,10 +1,10 @@
 import React, { useEffect } from 'react';
 import { PermissionsAndroid, Platform, View, Text, TouchableOpacity, Alert } from 'react-native';
 import RNHTMLtoPDF from 'react-native-html-to-pdf';
-import PushNotification from 'react-native-push-notification';
 import RNFetchBlob from 'rn-fetch-blob';
+import PushNotification from 'react-native-push-notification';
 
-const App = () => {
+const PdfGenerator = () => {
     useEffect(() => {
         requestStoragePermission();
         configureNotification();
@@ -87,19 +87,33 @@ const App = () => {
             // Define the path for downloading
             const imagePath = file.filePath;
 
-            if (Platform.OS === 'android') {
-                // Move the file to the downloads directory
-                const destPath = `${RNFetchBlob.fs.dirs.DownloadDir}/example.pdf`;
-                await RNFetchBlob.fs.mv(imagePath, destPath);
+            // Platform-specific configuration options
+            const configOptions = Platform.select({
+                ios: {
+                    fileCache: true,
+                    path: imagePath,
+                    appendExt: 'pdf',
+                },
+                android: {
+                    fileCache: true,
+                    path: imagePath,
+                    appendExt: 'pdf',
+                    addAndroidDownloads: {
+                        useDownloadManager: true,
+                        notification: true,
+                        path: imagePath,
+                        description: 'PDF file',
+                    },
+                },
+            });
 
-                // Notify the user that the download is complete
-                showNotification('Download Complete', `PDF saved to: ${destPath}`);
-                Alert.alert('PDF Downloaded', `PDF saved to: ${destPath}`);
-            } else {
-                // For iOS, you can directly alert the path
-                showNotification('Download Complete', `PDF saved to: ${imagePath}`);
-                Alert.alert('PDF Downloaded', `PDF saved to: ${imagePath}`);
-            }
+            // Fetch the file using RNFetchBlob
+            const response = await RNFetchBlob.config(configOptions).fetch('GET', file.filePath);
+
+            // Notify the user that the download is complete
+            showNotification('Download Complete', `PDF saved to: ${imagePath}`);
+
+            Alert.alert('PDF Downloaded', `PDF saved to: ${response.path()}`);
 
         } catch (error) {
             console.error(error);
@@ -116,4 +130,4 @@ const App = () => {
     );
 };
 
-export default App;
+export default PdfGenerator;
