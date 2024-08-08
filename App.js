@@ -1,9 +1,7 @@
 
-import React, { useCallback } from 'react';
+import React, {  useEffect } from 'react';
 
 import { Platform, View, Text, TouchableOpacity, Alert, Linking } from 'react-native';
-
-import { useFocusEffect } from '@react-navigation/native';
 
 import RNFetchBlob from 'rn-fetch-blob';
 
@@ -11,9 +9,9 @@ import { PERMISSIONS, request, check, RESULTS, openSettings } from 'react-native
  
 const PdfDownloader = () => {
 
-    useFocusEffect(
+    useEffect(
 
-        useCallback(() => {
+        () => {
 
             if (Platform.OS === 'android') {
 
@@ -21,7 +19,7 @@ const PdfDownloader = () => {
 
             }
 
-        }, [])
+        }, []
 
     );
  
