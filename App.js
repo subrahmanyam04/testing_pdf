@@ -1,133 +1,188 @@
-import React, { useEffect } from 'react';
-import { PermissionsAndroid, Platform, View, Text, TouchableOpacity, Alert } from 'react-native';
-import RNHTMLtoPDF from 'react-native-html-to-pdf';
+
+import React, { useCallback } from 'react';
+
+import { Platform, View, Text, TouchableOpacity, Alert, Linking } from 'react-native';
+
+import { useFocusEffect } from '@react-navigation/native';
+
 import RNFetchBlob from 'rn-fetch-blob';
-import PushNotification from 'react-native-push-notification';
 
-const PdfGenerator = () => {
-    useEffect(() => {
-        requestStoragePermission();
-        configureNotification();
-    }, []);
+import { PERMISSIONS, request, check, RESULTS, openSettings } from 'react-native-permissions';
+ 
+const PdfDownloader = () => {
 
-    const requestStoragePermission = async () => {
-        if (Platform.OS === 'android') {
-            try {
-                const granted = await PermissionsAndroid.request(
-                    PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
-                    {
-                        title: "Storage Permission",
-                        message: "This app needs access to your storage to download the PDF file.",
-                        buttonNeutral: "Ask Me Later",
-                        buttonNegative: "Cancel",
-                        buttonPositive: "OK"
-                    }
-                );
-                if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-                    console.log("You can use the storage");
-                } else {
-                    console.log("Storage permission denied");
-                }
-            } catch (err) {
-                console.warn(err);
+    useFocusEffect(
+
+        useCallback(() => {
+
+            if (Platform.OS === 'android') {
+
+                checkAndRequestStoragePermissions();
+
             }
-        }
-    };
 
-    const configureNotification = () => {
-        PushNotification.configure({
-            onNotification: function (notification) {
-                console.log("NOTIFICATION:", notification);
-            },
-            requestPermissions: Platform.OS === 'ios',
-        });
-    };
+        }, [])
 
-    const showNotification = (title, message) => {
-        PushNotification.localNotification({
-            title: title,
-            message: message,
-        });
-    };
-
-    const createPDF = async () => {
-        const htmlContent = `
-            <html>
-            <head>
-                <style>
-                    body {
-                        font-family: Arial, sans-serif;
-                        margin: 20px;
-                    }
-                    h1 {
-                        color: #333;
-                    }
-                    p {
-                        font-size: 14px;
-                    }
-                </style>
-            </head>
-            <body>
-                <h1>Title of PDF</h1>
-                <p>This is a paragraph in the PDF.</p>
-            </body>
-            </html>
-        `;
-
-        const options = {
-            html: htmlContent,
-            fileName: 'example',
-            directory: 'Documents',
-        };
+    );
+ 
+    const checkAndRequestStoragePermissions = async () => {
 
         try {
-            // Generate the PDF file
-            const file = await RNHTMLtoPDF.convert(options);
 
-            // Define the path for downloading
-            const imagePath = file.filePath;
+            console.log('Checking storage permissions...');
 
-            // Platform-specific configuration options
-            const configOptions = Platform.select({
-                ios: {
-                    fileCache: true,
-                    path: imagePath,
-                    appendExt: 'pdf',
-                },
-                android: {
-                    fileCache: true,
-                    path: imagePath,
-                    appendExt: 'pdf',
-                    addAndroidDownloads: {
-                        useDownloadManager: true,
-                        notification: true,
-                        path: imagePath,
-                        description: 'PDF file',
-                    },
-                },
-            });
+            const permission = PERMISSIONS.ANDROID.WRITE_EXTERNAL_STORAGE;
+ 
+            const status = await check(permission);
+ 
+            console.log(`Storage Permission Status: ${status}`);
+ 
+            if (status !== RESULTS.GRANTED) {
 
-            // Fetch the file using RNFetchBlob
-            const response = await RNFetchBlob.config(configOptions).fetch('GET', file.filePath);
+                await requestStoragePermissions(permission);
 
-            // Notify the user that the download is complete
-            showNotification('Download Complete', `PDF saved to: ${imagePath}`);
+            } else {
+
+                console.log("Storage permissions are already granted");
+
+            }
+
+        } catch (err) {
+
+            console.warn('Error checking storage permissions:', err);
+
+        }
+
+    };
+ 
+    const requestStoragePermissions = async (permission) => {
+
+        try {
+
+            console.log('Requesting storage permissions...');
+
+            const status = await request(permission);
+ 
+            console.log(`Storage Permission Request Result: ${status}`);
+ 
+            if (status === RESULTS.GRANTED) {
+
+                console.log("Storage permissions granted");
+
+            } else if (status === RESULTS.BLOCKED) {
+
+                console.log("Storage permissions blocked");
+
+                Alert.alert(
+
+                    'Permissions Blocked',
+
+                    'Storage permissions are blocked. Please go to settings and allow storage permissions for this app.',
+
+                    [
+
+                        {
+
+                            text: 'Cancel',
+
+                            style: 'cancel',
+
+                        },
+
+                        {
+
+                            text: 'Open Settings',
+
+                            onPress: () => openSettings(),
+
+                        },
+
+                    ]
+
+                );
+
+            } else {
+
+                console.log("Storage permissions denied");
+
+                Alert.alert('Permissions Denied', 'Storage permissions are required to download the PDF.');
+
+            }
+
+        } catch (err) {
+
+            console.warn('Error requesting storage permissions:', err);
+
+        }
+
+    };
+ 
+    const downloadPDF = async () => {
+
+        const pdfUrl = 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf';
+
+        const { config, fs } = RNFetchBlob;
+
+        const downloadDest = `${fs.dirs.DownloadDir}/dummy.pdf`;
+ 
+        const options = {
+
+            fileCache: true,
+
+            path: downloadDest,
+
+            addAndroidDownloads: {
+
+                useDownloadManager: true,
+
+                notification: true,
+
+                path: downloadDest,
+
+                description: 'Downloading PDF file',
+
+                mime: 'application/pdf',
+
+                mediaScannable: true,
+
+            }
+
+        };
+ 
+        try {
+
+            console.log('Downloading PDF...');
+
+            const response = await config(options).fetch('GET', pdfUrl);
+
+            console.log('PDF downloaded to:', response.path());
 
             Alert.alert('PDF Downloaded', `PDF saved to: ${response.path()}`);
 
         } catch (error) {
-            console.error(error);
-            Alert.alert('Error', 'Error creating or downloading PDF');
+
+            console.error('Error downloading PDF:', error);
+
+            Alert.alert('Error', 'Error downloading PDF');
+
         }
+
     };
-
+ 
     return (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <TouchableOpacity onPress={createPDF} style={{ padding: 20, backgroundColor: 'blue' }}>
-                <Text style={{ color: 'white' }}>Create and Download PDF</Text>
-            </TouchableOpacity>
-        </View>
-    );
-};
 
-export default PdfGenerator;
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+
+            <TouchableOpacity onPress={downloadPDF} style={{ padding: 20, backgroundColor: 'blue' }}>
+
+                <Text style={{ color: 'white' }}>Download PDF</Text>
+
+            </TouchableOpacity>
+
+        </View>
+
+    );
+
+};
+ 
+export default PdfDownloader;
